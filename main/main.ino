@@ -365,9 +365,11 @@ void setup() {
     }
   }
   else {
-    ttn_register(callback);
-    ttn_join();
-    ttn_adr(LORAWAN_ADR);
+    #if ENABLE_LORA
+      ttn_register(callback);
+      ttn_join();
+      ttn_adr(LORAWAN_ADR);
+    #endif
   }
 }
 
@@ -408,6 +410,7 @@ void loop() {
   }
 
   // Send every SEND_INTERVAL millis
+#if ENABLE_LORA  
   static uint32_t last = 0;
   static bool first = true;
   if (0 == last || millis() - last > SEND_INTERVAL) {
@@ -432,4 +435,8 @@ void loop() {
       delay(100);
     }
   }
+#endif
+#ifndef ENABLE_LORA
+  delay(100);
+#endif
 }
