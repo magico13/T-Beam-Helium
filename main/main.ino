@@ -258,7 +258,7 @@ void axp192Init() {
         } else {
             Serial.println("AXP192 Begin FAIL");
         }
-        axp.setChgLEDMode(AXP20X_LED_LOW_LEVEL);
+        axp.setChgLEDMode(AXP20X_LED_OFF);
         Serial.printf("DCDC1: %s\n", axp.isDCDC1Enable() ? "ENABLE" : "DISABLE");
         Serial.printf("DCDC2: %s\n", axp.isDCDC2Enable() ? "ENABLE" : "DISABLE");
         Serial.printf("LDO2: %s\n", axp.isLDO2Enable() ? "ENABLE" : "DISABLE");
