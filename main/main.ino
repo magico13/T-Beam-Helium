@@ -63,13 +63,7 @@ bool trySend() {
   // We also wait for altitude being not exactly zero, because the GPS chip generates a bogus 0 alt report when first powered on
   if (0 < gps_hdop() && gps_hdop() < 50 && gps_latitude() != 0 && gps_longitude() != 0 && gps_altitude() != 0)
   {
-    char buffer[40];
-    snprintf(buffer, sizeof(buffer), "Latitude: %10.6f\n", gps_latitude());
-    screen_print(buffer);
-    snprintf(buffer, sizeof(buffer), "Longitude: %10.6f\n", gps_longitude());
-    screen_print(buffer);
-    snprintf(buffer, sizeof(buffer), "Error: %4.2fm\n", gps_hdop());
-    screen_print(buffer);
+    printGPSData();
 
     buildPacket(txBuffer);
 
@@ -89,6 +83,19 @@ bool trySend() {
   }
 }
 
+void printGPSData() {
+  char buffer[40];
+  snprintf(buffer, sizeof(buffer), "Latitude: %10.6f\n", gps_latitude());
+  screen_print(buffer);
+  snprintf(buffer, sizeof(buffer), "Longitude: %10.6f\n", gps_longitude());
+  screen_print(buffer);
+  snprintf(buffer, sizeof(buffer), "Error: %4.2fm\n", gps_hdop());
+  screen_print(buffer);
+  // snprintf(buffer, sizeof(buffer), "Speed: %4.1f\n", gps_speed());
+  // screen_print(buffer);
+  snprintf(buffer, sizeof(buffer), "Dist: %4.1fm\n", gps_dist());
+  screen_print(buffer);
+}
 
 void doDeepSleep(uint64_t msecToWake)
 {
@@ -158,16 +165,16 @@ void callback(uint8_t message) {
     ttn_joined = true;
   }
   if (EV_JOINING == message) {
-    if (ttn_joined) {
-      screen_print("TTN joining...\n");
+    if (!ttn_joined) {
+      screen_print("HNT joining...\n");
     } else {
-      screen_print("Joined TTN!\n");
+      screen_print("Joined HNT!\n");
     }
   }
-  if (EV_JOIN_FAILED == message) screen_print("TTN join failed\n");
-  if (EV_REJOIN_FAILED == message) screen_print("TTN rejoin failed\n");
-  if (EV_RESET == message) screen_print("Reset TTN connection\n");
-  if (EV_LINK_DEAD == message) screen_print("TTN link dead\n");
+  if (EV_JOIN_FAILED == message) screen_print("HNT join failed\n");
+  if (EV_REJOIN_FAILED == message) screen_print("HNT rejoin failed\n");
+  if (EV_RESET == message) screen_print("Reset HNT connection\n");
+  if (EV_LINK_DEAD == message) screen_print("HNT link dead\n");
   if (EV_ACK == message) screen_print("ACK received\n");
   if (EV_PENDING == message) screen_print("Message discarded\n");
   if (EV_QUEUED == message) screen_print("Message queued\n");
@@ -180,8 +187,7 @@ void callback(uint8_t message) {
   }
 
   if (EV_RESPONSE == message) {
-
-    screen_print("[TTN] Response: ");
+    screen_print("[HNT] Response: ");
 
     size_t len = ttn_response_len();
     uint8_t data[len];
@@ -252,7 +258,7 @@ void axp192Init() {
         } else {
             Serial.println("AXP192 Begin FAIL");
         }
-        // axp.setChgLEDMode(LED_BLINK_4HZ);
+        axp.setChgLEDMode(AXP20X_LED_LOW_LEVEL);
         Serial.printf("DCDC1: %s\n", axp.isDCDC1Enable() ? "ENABLE" : "DISABLE");
         Serial.printf("DCDC2: %s\n", axp.isDCDC2Enable() ? "ENABLE" : "DISABLE");
         Serial.printf("LDO2: %s\n", axp.isLDO2Enable() ? "ENABLE" : "DISABLE");
@@ -261,7 +267,7 @@ void axp192Init() {
         Serial.printf("Exten: %s\n", axp.isExtenEnable() ? "ENABLE" : "DISABLE");
         Serial.println("----------------------------------------");
 
-        axp.setPowerOutPut(AXP192_LDO2, AXP202_ON); // LORA radio
+        axp.setPowerOutPut(AXP192_LDO2, ENABLE_LORA ? AXP202_ON : AXP202_OFF); // LORA radio
         axp.setPowerOutPut(AXP192_LDO3, AXP202_ON); // GPS main power
         axp.setPowerOutPut(AXP192_DCDC2, AXP202_ON);
         axp.setPowerOutPut(AXP192_EXTEN, AXP202_ON);
@@ -355,6 +361,7 @@ void setup() {
 #endif
 
   // TTN setup
+#if ENABLE_LORA
   if (!ttn_setup()) {
     screen_print("[ERR] Radio module not found!\n");
 
@@ -365,18 +372,31 @@ void setup() {
     }
   }
   else {
-    #if ENABLE_LORA
+    
       ttn_register(callback);
       ttn_join();
       ttn_adr(LORAWAN_ADR);
-    #endif
   }
+#endif
 }
 
 void loop() {
   gps_loop();
+#if ENABLE_LORA
   ttn_loop();
+#endif
   screen_loop();
+
+
+  static uint32_t lastDistUpdate = 0;
+  if (0 == lastDistUpdate || millis() - lastDistUpdate > SEND_INTERVAL) {
+    // update the distance travelled
+    float dist = gps_dist();
+    dist = gps_dist_update() - dist;
+    Serial.print("Dist update: ");
+    Serial.println(dist);
+    lastDistUpdate = millis();
+  }
 
   if (packetSent) {
     packetSent = false;
@@ -435,8 +455,9 @@ void loop() {
       delay(100);
     }
   }
-#endif
-#ifndef ENABLE_LORA
-  delay(100);
+#else
+  printGPSData();
+  screen_update();
+  delay(1000);
 #endif
 }

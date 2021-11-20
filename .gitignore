@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# arduino build outputs/vscode
+build
+.vscode

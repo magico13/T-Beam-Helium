@@ -26,6 +26,9 @@ uint32_t LongitudeBinary;
 uint16_t altitudeGps;
 uint8_t hdopGps;
 uint8_t sats;
+double prevLat = 0;
+double prevLng = 0;
+double distanceMeters = 0;
 char t[32]; // used to sprintf for Serial output
 
 TinyGPSPlus _gps;
@@ -45,6 +48,32 @@ float gps_longitude() {
 
 float gps_altitude() {
     return _gps.altitude.meters();
+}
+
+float gps_speed() {
+#ifdef SPEED_IN_MPH
+    return _gps.speed.mph();
+#else
+    return _gps.speed.kmph();
+#endif
+}
+
+float gps_dist() {
+    return distanceMeters;
+}
+
+float gps_dist_update() {
+    if (prevLat != 0 && prevLng != 0) {
+        double dist = _gps.distanceBetween(prevLat, prevLng,
+            _gps.location.lat(), _gps.location.lng());
+        if (dist > 10) {
+            // only add if significant (10 meters or more, roughly 0.5 m/s for 20s updates)
+            distanceMeters += dist;
+        }
+    }
+    prevLat = _gps.location.lat();
+    prevLng = _gps.location.lng();
+    return distanceMeters;
 }
 
 float gps_hdop() {
